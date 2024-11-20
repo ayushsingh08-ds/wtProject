@@ -3,182 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Me Map</title>
+    <title>Leaflet Map with Panic Button</title>
 
     <!-- Include Leaflet.js CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-    <!-- Add custom styles -->
     <style>
-        /* General styles */
-        * {
+        body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Roboto', Arial, sans-serif;
             height: 100vh;
-            display: flex;
-            flex-direction: column;
         }
-
-        /* Map container */
         #map {
-            height: 100%;
+            height: 100%; /* Map occupies the entire viewport */
             width: 100%;
+        }
+        #ui {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 10px;
             position: absolute;
             top: 0;
-            z-index: 1;
-        }
-
-        /* Header styling */
-        #header {
-            background: linear-gradient(45deg, #FF2E63, #C81D25);
-            color: white;
-            text-align: center;
-            padding: 15px 20px;
-            font-size: 20px;
-            font-weight: bold;
-            position: absolute;
-            top: 0;
+            left: 0;
             width: 100%;
-            z-index: 1000;
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Control container */
-        #controls {
-            position: absolute;
-            bottom: 10%;
-            left: 50%;
-            transform: translateX(-50%);
             z-index: 1000;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
         }
-
-        /* "Track Me" button */
-        .track-btn {
-            background: #FF2E63;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 30px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.3);
-            transition: transform 0.2s ease, background 0.2s ease;
+        #ui h2 {
+            margin: 5px 0;
         }
-
-        .track-btn:hover {
-            background: #C81D25;
-            transform: translateY(-3px);
-        }
-
-        /* Panic button */
-        #panic {
-            background: #C81D25;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
+        #ui #controls {
+            margin-top: 10px;
             display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
             justify-content: center;
-            align-items: center;
-            box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            transition: transform 0.2s ease;
         }
-
-        #panic:hover {
-            transform: scale(1.1);
-        }
-
-        #panic img {
-            width: 40px;
-            height: 40px;
-        }
-
-        /* Tooltip styling for buttons (optional) */
-        .tooltip {
+        .button {
+            padding: 10px 15px;
             font-size: 14px;
-            color: #555;
-            background: #fff;
-            border: 1px solid #ddd;
+            border: none;
+            cursor: pointer;
             border-radius: 5px;
-            padding: 5px 10px;
-            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-            margin-top: 5px;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.2s ease, visibility 0.2s ease;
-            position: absolute;
+            background-color: #007BFF;
+            color: white;
+            transition: background-color 0.3s ease, transform 0.2s ease;
         }
-
-        #panic:hover .tooltip,
-        .track-btn:hover .tooltip {
-            opacity: 1;
-            visibility: visible;
+        .button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+        /* Panic Button Styles */
+        #panicButton {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: url('https://lifelinkapps.org/wp-content/uploads/2021/07/sosbutton.gif') no-repeat center center / cover; /* URL of the SOS image */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        #panicButton:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+        /* Ripple effect */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple-animation 0.6s linear;
+            background: rgba(255, 255, 255, 0.7);
+            pointer-events: none;
+        }
+        @keyframes ripple-animation {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <div id="header">
-        Track Me - Share Your Live Location with Close Contacts
+    <!-- UI Section -->
+    <div id="ui">
+        <h2>Current Location</h2>
+        <p id="locationInfo">Loading location...</p>
+        <div id="controls">
+            <button class="button" id="refreshLocation">Refresh Location</button>
+            <button class="button" id="centerLocation">Center on My Location</button>
+        </div>
     </div>
+
+    <!-- Panic Button -->
+    <div id="panicButton"></div>
 
     <!-- Map Section -->
     <div id="map"></div>
-
-    <!-- UI Controls -->
-    <div id="controls">
-        <button class="track-btn" onclick="getLocation()">
-            Track Me
-            <span class="tooltip">Find your current location</span>
-        </button>
-        <div id="panic">
-            <img src="https://cdn-icons-png.flaticon.com/512/1828/1828884.png" alt="Panic Icon" />
-            <span class="tooltip">Send an emergency alert</span>
-        </div>
-    </div>
 
     <!-- Include Leaflet.js -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <script>
-        // Initialize the map
-        var map = L.map('map').setView([51.505, -0.09], 13); // Default view
+        let currentLocationMarker;
+        let userLocation; // Store the user's current location
 
-        // Add OpenStreetMap tiles
+        // Initialize map
+        const map = L.map('map').setView([51.505, -0.09], 13); // Default to London
+
+        // Set up the map layer (OpenStreetMap tiles)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Function to get the current location
+        // Function to get current location
         function getLocation() {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function (position) {
-                    var lat = position.coords.latitude;
-                    var lon = position.coords.longitude;
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
 
-                    // Center the map to the user's location
-                    var userLocation = L.latLng(lat, lon);
-                    map.setView(userLocation, 15);
-                    L.marker(userLocation).addTo(map)
-                        .bindPopup("You are here.")
-                        .openPopup();
-                }, function () {
-                    alert("Geolocation failed or permission denied.");
+                    // Update current location
+                    userLocation = L.latLng(lat, lon);
+
+                    // Update or create marker
+                    if (currentLocationMarker) {
+                        currentLocationMarker.setLatLng(userLocation).openPopup();
+                    } else {
+                        currentLocationMarker = L.marker(userLocation)
+                            .addTo(map)
+                            .bindPopup('You are here')
+                            .openPopup();
+                    }
+
+                    // Center map on the current location
+                    map.setView(userLocation, 13);
+
+                    // Update the UI with the current location
+                    document.getElementById('locationInfo').innerHTML = `Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
+                }, function() {
+                    alert('Geolocation failed or permission denied.');
                 });
             } else {
-                alert("Geolocation is not supported by this browser.");
+                alert('Geolocation is not supported by this browser.');
             }
         }
+
+        // Refresh location when the button is clicked
+        document.getElementById('refreshLocation').addEventListener('click', getLocation);
+
+        // Center map on current location when the button is clicked
+        document.getElementById('centerLocation').addEventListener('click', function() {
+            if (userLocation) {
+                map.setView(userLocation, 13);
+            } else {
+                alert('Location not available yet. Please refresh location first.');
+            }
+        });
+
+        // Panic Button Click Handler with Ripple Effect
+        document.getElementById('panicButton').addEventListener('click', function(e) {
+            alert('🚨 SOS Emergency Triggered! Contacting emergency services...');
+            // Add ripple effect
+            const button = e.currentTarget;
+            const circle = document.createElement('span');
+            const diameter = Math.max(button.clientWidth, button.clientHeight);
+            const radius = diameter / 2;
+
+            circle.style.width = circle.style.height = `${diameter}px`;
+            circle.style.left = `${e.clientX - button.offsetLeft - radius}px`;
+            circle.style.top = `${e.clientY - button.offsetTop - radius}px`;
+            circle.classList.add('ripple');
+
+            const ripple = button.getElementsByClassName('ripple')[0];
+            if (ripple) {
+                ripple.remove();
+            }
+
+            button.appendChild(circle);
+        });
+
+        // Call the getLocation function to fetch and display the location
+        getLocation();
+
+        // Optional: Allow the user to refresh the map automatically every minute
+        setInterval(getLocation, 60000);
     </script>
 </body>
 </html>
