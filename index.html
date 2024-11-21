@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Night Safety Companion</title>
+
+    <!-- Include Leaflet.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Include Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.css" />
+
+    <style>
+        /* Full-screen map */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Header styling */
+        #header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 60px;
+            background-color: #b71c1c;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        /* Bottom Section Styling */
+        #bottom-section {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: white;
+            padding: 20px 10px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            border-radius: 20px 20px 0 0;
+        }
+
+        /* Buttons styling */
+        .button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .button img {
+            width: 50px;
+            height: 50px;
+        }
+
+        .button span {
+            font-size: 14px;
+            color: #333;
+        }
+
+        /* SOS Button Styling */
+        #bell-icon {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: url('bell.avif') no-repeat center center;
+            background-size: contain;
+            cursor: pointer;
+            z-index: 1100;
+        }
+
+        /* Timer and Distance Display */
+        #timer-distance {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ffcc00;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 1001;
+        }
+
+        /* Popup styling */
+        #popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            color: black;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            z-index: 2000;
+            text-align: center;
+            font-size: 16px;
+            animation: fadeIn 0.5s;
+        }
+
+        #popup button {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #b71c1c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Map Section -->
+    <div id="map"></div>
+
+    <!-- Header -->
+    <div id="header">
+        Night safety Companion to hostel                           
+    </div>
+
+    <!-- Timer and Distance Display -->
+    <div id="timer-distance">
+        You will reach in: <span id="time-remaining">-</span> | Distance: <span id="distance-remaining">-</span> km
+    </div>
+
+    <!-- SOS Button -->
+    <div id="bell-icon" onclick="sendSOS()"></div>
+
+    <!-- Popup -->
+    <div id="popup">
+        <p>Your location has been sent to your close contact for monitoring.</p>
+        <button onclick="closePopup()">Close</button>
+    </div>
+
+    <!-- Bottom Section -->
+    <div id="bottom-section">
+        <a href="safetyrules.html"><button class="button" >
+            <img src="safe.png" alt="Safety Rules" />
+            <span>Safety Rules</span>
+        </button></a>
+        <button class="button" onclick="getLocation()">
+            <img src="mylocation.jpeg" alt="My Location" />
+            <span>My Location</span>
+        </button>
+        <button class="button" onclick="shareLocation()">
+            <img src="share.webp" alt="Share Location" />
+            <span>Share Location</span>
+        </button>
+        <button class="button" onclick="navigateToHostel()">
+            <img src="hos.webp" alt="Go to Hostel" />
+            <span>Go to Hostel</span>
+        </button>
+    </div>
+
+    <!-- Include Leaflet.js -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Include Leaflet Routing Machine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+
+    <script>
+        // Initialize the map
+        const map = L.map('map', {
+            zoomControl: true,
+            attributionControl: true
+        }).setView([12.889764, 77.541695], 15);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Hostel coordinates
+        const hostelCoordinates = [12.658239321410376, 77.44717505427728];
+        let routingControl;
+
+        // Timer and Distance DOM elements
+        const timeRemainingElement = document.getElementById("time-remaining");
+        const distanceRemainingElement = document.getElementById("distance-remaining");
+
+        // Popup DOM element
+        const popup = document.getElementById("popup");
+
+        // Function to calculate time remaining based on distance and speed
+        function calculateTime(distanceInKm, speedKmph = 40) {
+            const timeInHours = distanceInKm / speedKmph;
+            const minutes = Math.ceil(timeInHours * 60); // Convert to minutes
+            return `${minutes} mins`;
+        }
+
+        // Get user's current location
+        function getLocation() {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    map.setView([latitude, longitude], 15);
+                    L.marker([latitude, longitude]).addTo(map).bindPopup("You are here!").openPopup();
+                },
+                (error) => {
+                    alert("Unable to retrieve your location.");
+                }
+            );
+        }
+
+        // Navigate to hostel
+        function navigateToHostel() {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    if (routingControl) {
+                        map.removeControl(routingControl);
+                    }
+
+                    routingControl = L.Routing.control({
+                        waypoints: [L.latLng(latitude, longitude), L.latLng(hostelCoordinates)],
+                        routeWhileDragging: true,
+                        createMarker: () => null,
+                        lineOptions: {
+                            styles: [{ color: "#ff0000", weight: 5 }]
+                        }
+                    }).addTo(map);
+
+                    // Update time and distance during the route
+                    routingControl.on('routesfound', function (e) {
+                        const route = e.routes[0];
+                        const distanceInKm = (route.summary.totalDistance / 1000).toFixed(2);
+                        const timeRemaining = calculateTime(distanceInKm);
+
+                        // Update UI
+                        timeRemainingElement.innerText = timeRemaining;
+                        distanceRemainingElement.innerText = distanceInKm;
+                    });
+                },
+                (error) => {
+                    alert("Unable to retrieve your location.");
+                }
+            );
+        }
+
+        // Send SOS alert
+        function sendSOS() {
+            alert("SOS sent! Help is on the way.");
+        }
+
+        // Show safety rules
+      
+
+        // Show popup for sharing location
+        function shareLocation() {
+            popup.style.display = "block";
+        }
+
+        // Close popup
+        function closePopup() {
+            popup.style.display = "none";
+        }
+    </script>
+</body>
+
+</html>
